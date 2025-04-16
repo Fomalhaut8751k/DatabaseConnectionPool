@@ -358,12 +358,86 @@ int main()
 }
 #endif
 // ###### 智能指针shared_ptr ##########################################################
+#if 0
+#include<memory>
+/*
+	一般裸指针需要手动的delete释放掉。如果忘记了或者程序发生，就容易导致内存泄漏
+	智能指针    保证能做到资源的自动释放
+	shared_ptr: 强智能指针，可以改变资源的引用计数
+
+	shared_ptr会有交叉引用的问题，可以配合weak_ptr一起使用
+*/
+
+class B;
+class A {
+public:
+	A() { cout << "A()" << endl; }
+	~A() { cout << "~A()" << endl; }
+	// shared_ptr<B> _ptrb;
+	weak_ptr<B> _ptrb;  // 交叉引用的解决方法：类内引用使用弱智能指针
+};
+class B {
+public:
+	B() { cout << "B()" << endl; }
+	~B() { cout << "~B()" << endl; }
+	//shared_ptr<A> _ptra;
+	weak_ptr<A> _ptra;
+};
+
+int main() {
+	shared_ptr<A> pa(new A());
+	shared_ptr<B> pb(new B());
+
+	pa->_ptrb = pb;  // 交叉引用
+	pb->_ptra = pa;
+
+	cout << pa.use_count() << endl;
+	cout << pb.use_count() << endl;
+
+	cout << pa->_ptrb.use_count() << endl;
+	cout << pb->_ptra.use_count() << endl;
+
+	return 0;
+}
+#endif
+// ###### lambda表达式 ####################################################################
+#if 0
+#include<functional>
+#include<algorithm>
+#include<vector>
+int main()
+{
+	auto func = [](int a, int b)->int { return a + b; };
+	vector<int> vec = { 1, 2, 3 ,4 ,5 ,6 };
+	for_each(vec.begin(), vec.end(), [](int a)->void {cout << a << " "; });
+	cout << endl;
+
+}
+#endif
+// ###### 其他测试1 #################################################################
 #if 1
+#include<functional>
+#include<thread>
+class A
+{
+public:
+	A(int a = 10) :_a(a) {};
+	void show()
+	{
+		cout << "pdcHelloWorld" << endl;
+	}
+	
+private:
+	int _a;
+};
 
 int main()
 {
-
-
+	A a;
+	// thread t1(a.show)  // 指向绑定函数的指针只能用于调用函数
+	// thread t1(A::show())  // 非静态成员引用必须与特定对象相对
+	thread t1(std::bind(&A::show, &a));
+	t1.join();
 	return 0;
 }
 #endif

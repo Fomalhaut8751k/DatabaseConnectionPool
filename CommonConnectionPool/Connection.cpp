@@ -47,3 +47,15 @@ MYSQL_RES* Connection::query(string sql)
 	}
 	return mysql_use_result(_conn);
 }
+
+// 刷新连接的起始的空闲时间点
+void Connection::refreshAliveTime()
+{
+	_alivetime = clock();
+}
+
+// 返回存活的时间
+clock_t Connection::getAliceTime() const
+{
+	return clock() - _alivetime;
+}

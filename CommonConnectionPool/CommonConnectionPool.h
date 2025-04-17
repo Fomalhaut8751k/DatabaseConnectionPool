@@ -27,6 +27,11 @@ private:
 	// 运行在独立的线程中，专门负责生成新连接
 	void produceConnectionTask();
 
+	// 运行在独立的线程中，管理队列中空闲连接时间超过maxIdleTime的连接的释放
+	void recycleConnectionTask_v1();
+
+	void recycleConnectionTask();
+
 	string _ip;  // mysql的ip地址
 	unsigned short _port;  // mysql的端口号 3306
 	string _username;  // mysql登录用户名

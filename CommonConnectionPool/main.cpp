@@ -20,7 +20,7 @@ int main()
 
     clock_t begin = clock();
     
-#if 0
+#if 1
     thread t1([]() {
         ConnectionPool* cp = ConnectionPool::getConnectionPool();
         for (int i = 0; i < 2500; ++i)
@@ -98,7 +98,7 @@ int main()
         });
 
 #endif
-#if 1
+#if 0
     Connection conn;
     conn.connect("127.0.0.1", 3306, "root", "123456", "chat");
 

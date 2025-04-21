@@ -28,7 +28,8 @@ ConnectionPool::ConnectionPool()
 	}
 	
 	// 启动一个新的线程，作为连接的生产者
-	thread produce(std::bind(&ConnectionPool::produceConnectionTask, this));
+	//thread produce(std::bind(&ConnectionPool::produceConnectionTask, this));
+	thread produce(&ConnectionPool::produceConnectionTask, this);
 	produce.detach();
 	/*
 		由于produceConnectionTask是成员函数，它的调用依赖于对象，需要把
@@ -118,6 +119,7 @@ bool ConnectionPool::loadConfigFile()
 // 给外部提供接口从连接池中获取一个空闲连接
 shared_ptr<Connection> ConnectionPool::getConnection()
 {
+
 	/*
 		通过一个智能指针，当用户不用时就自动析构，然后重定义智能指针的
 		删除资源的方式(删除器)

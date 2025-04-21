@@ -415,7 +415,7 @@ int main()
 }
 #endif
 // ###### 其他测试1 #################################################################
-#if 1
+#if 0
 #include<functional>
 #include<thread>
 class A
@@ -437,7 +437,203 @@ int main()
 	// thread t1(a.show)  // 指向绑定函数的指针只能用于调用函数
 	// thread t1(A::show())  // 非静态成员引用必须与特定对象相对
 	thread t1(std::bind(&A::show, &a));
+	thread t2(&A::show, &a);
+
+
 	t1.join();
+	t2.join();
+	return 0;
+}
+#endif
+// ###### 其他测试2 #################################################################
+#if 0
+/* 
+	同步通信
+*/
+#include<thread>
+#include<mutex>
+#include<condition_variable>
+
+std::mutex mtx;
+std::condition_variable cv;
+
+atomic_int cnt = 100;
+
+void threadHandle01()
+{
+	for(;;)
+	{
+		unique_lock<mutex> lck(mtx);
+		while (cnt > 0)
+		{
+			cout << "线程1进入等待状态" << endl;
+			cv.wait(lck);
+			cout << "线程1退出等待状态" << endl;
+			std::this_thread::sleep_for(std::chrono::seconds(3));
+		}
+	}
+}
+
+void threadHandle02()
+{
+	for (;;)
+	{
+		{
+			unique_lock<mutex> lck(mtx);
+			cout << "线程2输出: " << cnt-- << endl;
+			std::this_thread::sleep_for(std::chrono::milliseconds(500));
+		}
+		cv.notify_all();
+		std::this_thread::sleep_for(std::chrono::milliseconds(500));
+	}
+}
+
+int main()
+{
+	std::thread t2(threadHandle02); 
+	std::thread t1(threadHandle01);
+
+	/*
+		t2先启动，t1随后。t2先取得互斥锁然后上锁，t2打印cnt=100，然后cnt变为99
+		然后出作用于，锁被释放，在t2执行notify_all()和休眠0.5s的时间内，t1已经
+		先取得了互斥锁并上锁，然后t1进入等待状态，通过wait()释放锁，而t2又拿到
+		了互斥锁然后上锁，t2打印cnt=99，然后t2执行notify_all(),于是t1退出等待
+		状态并重新上锁。
+	*/
+	
+	t2.join();
+	t1.join();
+}
+#endif
+// ###### 其他测试3 #################################################################
+#if 0
+#include<thread>
+#include<mutex>
+#include<condition_variable>
+
+std::mutex mtx;
+std::condition_variable cv;
+/*
+	同步通信2
+*/
+void threadHandle01()
+{
+	// 每隔一秒调用一次cv.notify_all();
+	while (1)
+	{
+		cv.notify_all();
+		std::this_thread::sleep_for(std::chrono::seconds(1));
+	}
+}
+
+void threadHandle02()
+{
+	unique_lock<mutex> lck(mtx);
+	while (1)
+	{
+		cout << "线程2进入等待状态" << endl;
+		cv.wait(lck);  // 
+		cout << "线程2退出等待状态" << endl;
+	}
+}
+
+int main()
+{
+	thread t2(threadHandle02);
+	thread t1(threadHandle01);
+
+	t2.join();
+	t1.join();
+}
+#endif
+// ###### 其他测试4 #################################################################
+#if 0
+/*
+	对不同线程的唤醒执行不同的操作
+*/
+#include<thread>
+#include<condition_variable>
+#include<mutex>
+
+std::mutex mtx;
+std::condition_variable cv;
+
+std::atomic_bool label = false;
+
+void threadHandle01()
+{
+	for (;;)
+	{
+		std::this_thread::sleep_for(std::chrono::seconds(2));
+		label = true;
+		cout << "线程1发出通知" << endl;
+		
+		cv.notify_all();
+		std::this_thread::sleep_for(std::chrono::seconds(1));
+		label = false;
+	}
+
+}
+
+void threadHandle02()
+{
+	std::this_thread::sleep_for(std::chrono::seconds(1));
+	for (;;)
+	{
+		std::this_thread::sleep_for(std::chrono::seconds(2));
+		cout << "线程2发出通知" << endl;
+		
+		cv.notify_all();
+	}
+}
+
+int main()
+{
+	std::thread t1(threadHandle01);
+	std::thread t2(threadHandle02);
+
+	unique_lock<std::mutex> lck(mtx);
+	while (1)
+	{
+		// 理论上主线程只接受线程1的通知
+		std::this_thread::sleep_for(std::chrono::milliseconds(200));
+		/*
+			线程1发出通知时，会把label置为true，线程醒来发现label确实是
+			true，于是上锁，执行下面的输出语句
+			线程2发出通知时，会把label置为false，线程醒来时发现label是false，
+			于是继续睡，不会执行下面的输出语句
+		*/
+		cv.wait(lck, [] { return label == true; });
+		cout << "主线程响应" << endl;
+	}
+
+
+	t1.join();
+	t2.join();
+
+}
+
+#endif
+// ###### 其他测试5 #################################################################
+#if 1
+class A
+{
+public:
+	virtual void show()
+	{
+		cout << "pdcHelloWorld" << endl;
+	}
+};
+
+class B : public A
+{
+
+};
+
+int main()
+{
+	B b;
+	b.show();
 	return 0;
 }
 #endif

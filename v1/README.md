@@ -112,3 +112,45 @@ MySQL数据库编程、单例模式、queue队列容器、C++11多线程编程�
 
 		cv.notify_all(); 
         ```
+
+
+## 5. 问题解决
+- 线程池先创建，并启动生产者线程。随后用户开始申请连接，当需要生产者为vip用户创建新的连接时：
+    ```cpp
+    cv.notify_all();  
+    cv.wait(lock, 
+        [&]() -> bool {
+            return (!_connectQueue.empty()) 
+                    && (_designedForVip == 2);
+        }
+    );
+    ```
+    先notify_all()，则生产者判断条件成立后由等待进入阻塞：
+
+    ```cpp
+    cv.wait(lock, 
+    [&]() -> bool {
+			return _produceForVip == true;
+		}
+	);
+    ```
+    而此刻阻塞的还有其他vip用户也在阻塞，于是当前用户线程想要通知生产者生产线程时，实际上是生产者和其他用户一起抢一个锁。这就导致，如果其他用户抢到锁后，也发起了一个notify通知生产者生产，这时已经有两个用户需要了，但接下来只生产一个，甚至接下来的锁还是被其他用户抢了。
+
+
+    ### 设置一个标志_priorUser来限定：
+
+
+
+    ```cpp
+    unique_lock<mutex> lock(_queueMutex);
+	cv.wait(lock,
+		[&]() -> bool {
+			return _priorUser == true;
+		}
+	);
+	_priorUser = false;
+    ```
+    
+    第一个用户进来时，上锁，其他用户阻塞在临界区外，判断条件成立，依然持有锁，然后_priorUser置为false。它申请完连接，就把_priorUser置回true，离开作用域后解锁。其他用户照常进行。
+
+    第二个用户进来时，上锁，其他用户阻塞在临界区外，判断条件成立，依然持有锁，然后_priorUser置为false。它发现没有空闲连接了，就通知生产者生产连接，因为此时_priorUser为false，先notify_all()使生产者从等待进入阻塞，然后wait等待并释放锁，此时如果用户抢到了锁，它会进入wait并判断条件不成立，于是原地等待让出锁，故最终锁还是会交到生产者线程手上。

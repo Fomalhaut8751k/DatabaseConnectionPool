@@ -638,7 +638,7 @@ int main()
 }
 #endif
 // ###### 其他测试6 #################################################################
-#if 1
+#if 0
 #include<thread>
 #include<mutex>
 #include<condition_variable>
@@ -681,4 +681,21 @@ int main()
 
 	return 0;
 }
+#endif
+// ###### 其他测试7 #################################################################
+#if 1
+int main()
+{
+	shared_ptr<int> ptr(new int(10),
+		[](int* p) -> void {
+			cout << "pdcHelloWorld" << endl;
+			delete p;
+		}
+	);
+	ptr.reset();
+	ptr = nullptr;
+
+	system("pause");
+}
+
 #endif

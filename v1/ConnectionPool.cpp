@@ -15,6 +15,7 @@ ConnectionPool::ConnectionPool()
 {
 	_designedForVip = 0;  // 判断是否是为vip专门生产的连接
 	_produceForVip = false;  // 判断是否在(initSize, maxSize)条件下发来的请求
+	_priorUser = true;
 
 	// 加载配置项
 	if (!loadConfigFile())
@@ -116,6 +117,14 @@ bool ConnectionPool::loadConfigFile()
 shared_ptr<Connection> ConnectionPool::getConnection(AbstractUser* _abUser)
 {
 	unique_lock<mutex> lock(_queueMutex);
+	
+	cv.wait(lock,
+		[&]() -> bool {
+			return _priorUser == true;
+		}
+	);
+	_priorUser = false;
+
 	// 判断申请连接的是普通用户还是vip用户
 	if (dynamic_cast<CommonUser*>(_abUser) != nullptr)
 	{	// 如果是普通用户
@@ -123,10 +132,16 @@ shared_ptr<Connection> ConnectionPool::getConnection(AbstractUser* _abUser)
 		// 只判断一次，没有就排队
 		if (_connectQueue.empty())  
 		{
+			cout << "_produceForVip: " << _produceForVip << " "
+				<< "_designedForVip: " << _designedForVip << " "
+				<< "_connectQueue.size():" << _connectQueue.size() << " "
+				<< "_connectionCnt: " << _connectionCnt << endl;
+
 			commonUserDeque.push_back(dynamic_cast<CommonUser*>(_abUser));
 
 			cout << "用户" << _abUser << "正在排队中......"
 				<< "前面还有" << vipUserDeque.size() + commonUserDeque.size() << "人" << endl;
+			_priorUser = true;
 			cv.wait(lock, [&]() -> bool {
 				// 有空闲连接 -> vip通道没有人在排队 -> 我是队头
 				return (!_connectQueue.empty())
@@ -144,12 +159,27 @@ shared_ptr<Connection> ConnectionPool::getConnection(AbstractUser* _abUser)
 
 		if (_connectQueue.empty())
 		{
+			cout << "\n_produceForVip: " << _produceForVip << " "
+				<< "_designedForVip: " << _designedForVip << " "
+				<< "_connectQueue.size():" << _connectQueue.size() << " "
+				<< "_connectionCnt: " << _connectionCnt << "/" << _maxSize << " "
+				<< "vipUserDeque.size(): " << vipUserDeque.size() << endl;
+				
+
 			// 如果已经超过了maxSize，即使是vip也得乖乖排队
 			if (_connectionCnt >= _maxSize)
 			{
 				vipUserDeque.push_back(dynamic_cast<VipUser*>(_abUser));
 				cout << "用户" << _abUser << "正在排队中......正在为您开启vip通道，"
-					<< "前面还有" << vipUserDeque.size() << "人" << endl;
+					<< "前面还有" << vipUserDeque.size() - 1 << "人" << endl;
+				
+				for (VipUser* vu : vipUserDeque)
+				{
+					cout << vu << " ";
+				}cout << endl;
+
+				_priorUser = true;
+
 				cv.wait(lock, 
 					[&]() -> bool {
 					// 优先级：有空闲连接 -> 我是队头
@@ -163,8 +193,10 @@ shared_ptr<Connection> ConnectionPool::getConnection(AbstractUser* _abUser)
 			// 如果没有超过，可以为vip用户申请专属的连接
 			else
 			{
+				cout << "pdcHelloWorld" << endl;
 				// 等待生产者生成新的连接
-				_produceForVip = 1;  
+				_produceForVip = true;
+				_designedForVip = 1;
 				cv.notify_all();  
 				cv.wait(lock, 
 					[&]() -> bool {
@@ -189,9 +221,7 @@ shared_ptr<Connection> ConnectionPool::getConnection(AbstractUser* _abUser)
 
 	cout << "用户" << _abUser << "成功申请到了连接" << endl;
 
-	cout << _connectQueue.size() << " " << _designedForVip << " " << _produceForVip << " "
-		<< commonUserDeque.size() << " " << vipUserDeque.size() << endl;
-
+	_priorUser = true;
 	_connectQueue.pop();  // 然后弹出
 	cv.notify_all();  // 消费后就通知
 
@@ -214,6 +244,9 @@ void ConnectionPool::produceConnectionTask()
 				}
 			);
 		}
+		cout << "_produceForVip: " << _produceForVip << " "
+			<< "_designedForVip: " << _designedForVip << endl;
+
 		cout << "为vip用户创建新的连接...."  << endl;
 		Connection* p = new Connection();
 		p->connect(_ip, _port, _username, _password, _dbname);
@@ -231,47 +264,6 @@ void ConnectionPool::produceConnectionTask()
 }
 
 // 运行在独立的线程中，管理队列中空闲连接时间超过maxIdleTime的连接的释放
-void ConnectionPool::recycleConnectionTask_v1()
-{
-	/*
-		如果连接池中空闲的连接数量超过initsize,并且其中存在(归还到queue)连接的空闲时间
-		超过maxidletime，那么就把这些空闲的连接回收掉，最终只保留initsize个
-
-		从queue的头取出，从尾部放回，那么空闲时间应该是从队头到队尾逐渐递减的
-		如果当前队列内空闲连接的数量大于initsize（while(_connectionCnt > _initSize)）
-		判断队头，如果队头的空闲时间大于最大空闲时间，就把它回收
-
-		如何计算一个线程的空闲时间？cv.wait_for()?
-
-		其他线程操作：
-		1. getConnection
-		2. produceConnectionTask(线程的同步通信)
-		3. 归还连接到connection
-	*/
-	for (;;)
-	{
-		unique_lock<mutex> lock(_queueMutex);
-		while (_connectionCnt <= _initSize)
-		{
-			// 消费者通知该线程他getConnection——取走了队头的连接
-			// 就要重新计算新队头的时间——从零开始？不从零开始
-			// 如果不从零开始，就得记录队列中每一个的空闲时间
-			if (cv_status::timeout == cv.wait_for(lock, chrono::seconds(_maxIdleTime)))
-			{	// 如果是超时被唤醒的
-				if (_connectionCnt <= _initSize)
-				{
-					_connectQueue.front()->~Connection();
-					_connectQueue.pop();
-				}
-			}
-			else
-			{  // 如果是连接被申请走了后被唤醒的
-				continue;  // 那就重新开始计时
-			}
-		}
-	}
-}
-
 void ConnectionPool::recycleConnectionTask()
 {
 	/*
@@ -290,6 +282,7 @@ void ConnectionPool::recycleConnectionTask()
 			{
 				_connectQueue.pop();
 				_connectionCnt--;
+				cout << "有连接超时将被释放" << endl;
 				delete p;  // 释放连接
 			}
 			else

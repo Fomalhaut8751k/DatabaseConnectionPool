@@ -30,8 +30,6 @@ private:
 	void produceConnectionTask();
 
 	// 运行在独立的线程中，管理队列中空闲连接时间超过maxIdleTime的连接的释放
-	void recycleConnectionTask_v1();
-
 	void recycleConnectionTask();
 
 	string _ip;  // mysql的ip地址
@@ -54,4 +52,5 @@ private:
 	atomic_int _designedForVip;  // 判断是否是为vip专门生产的连接
 
 	atomic_bool _produceForVip;  // 判断是否在(initSize, maxSize)条件下发来的请求
+	atomic_bool _priorUser; 
 };

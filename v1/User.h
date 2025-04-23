@@ -1,24 +1,40 @@
 #pragma once
 #include<iostream>
-#include"User.h"
+
 #include"ConnectionPool.h"
+#include"Connection.h"
+
+class ConnectionPool;
 
 class AbstractUser
 {
 public:
-	AbstractUser(ConnectionPool* cp);
+	AbstractUser();
+	
+	// 用户发起连接请求
+	void toConnect(ConnectionPool* _pConnectPool);
 
-	virtual void update();
+	// 用户行为一
+	void update();
+
+	// 刷新连接的起始的空闲时间点
+	void refreshAliveTime();
+
+	// 返回存活的时间
+	clock_t getAliceTime() const;
+
+	virtual void show();
 
 protected:
-	shared_ptr<Connection> _conn;
+	shared_ptr<Connection> _Connection;
+	clock_t _alivetime;  // 记录进入用户不操作时间
 };
 
 // 普通用户
 class CommonUser : public AbstractUser
 {
 public:
-	CommonUser(ConnectionPool* cp);
+	CommonUser();
 };
 
 
@@ -26,5 +42,5 @@ public:
 class VipUser : public AbstractUser
 {
 public:
-	VipUser(ConnectionPool* cp);
+	VipUser();
 };

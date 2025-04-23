@@ -6,13 +6,14 @@
 #include<condition_variable>
 
 #include"ConnectionPool.h"
+#include"Connection.h"
 #include"User.h"
 
 using namespace std;
 
 ConnectionPool::ConnectionPool()
 {
-	_designedForVip = false;  // 判断是否是为vip专门生产的连接
+	_designedForVip = 0;  // 判断是否是为vip专门生产的连接
 	_produceForVip = false;  // 判断是否在(initSize, maxSize)条件下发来的请求
 
 	// 加载配置项
@@ -123,12 +124,15 @@ shared_ptr<Connection> ConnectionPool::getConnection(AbstractUser* _abUser)
 		if (_connectQueue.empty())  
 		{
 			commonUserDeque.push_back(dynamic_cast<CommonUser*>(_abUser));
+
+			cout << "用户" << _abUser << "正在排队中......"
+				<< "前面还有" << vipUserDeque.size() + commonUserDeque.size() << "人" << endl;
 			cv.wait(lock, [&]() -> bool {
 				// 有空闲连接 -> vip通道没有人在排队 -> 我是队头
 				return (!_connectQueue.empty())
 					&& vipUserDeque.empty()
 					&& commonUserDeque.front() == _abUser
-					&& (!_designedForVip);
+					&& (_designedForVip == 0);
 				}
 			);
 			// 三个条件不满足就一直等，直到都满足
@@ -144,7 +148,10 @@ shared_ptr<Connection> ConnectionPool::getConnection(AbstractUser* _abUser)
 			if (_connectionCnt >= _maxSize)
 			{
 				vipUserDeque.push_back(dynamic_cast<VipUser*>(_abUser));
-				cv.wait(lock, [&]() -> bool {
+				cout << "用户" << _abUser << "正在排队中......正在为您开启vip通道，"
+					<< "前面还有" << vipUserDeque.size() << "人" << endl;
+				cv.wait(lock, 
+					[&]() -> bool {
 					// 优先级：有空闲连接 -> 我是队头
 						return (!_connectQueue.empty())
 							&& vipUserDeque.front() == _abUser;
@@ -157,13 +164,15 @@ shared_ptr<Connection> ConnectionPool::getConnection(AbstractUser* _abUser)
 			else
 			{
 				// 等待生产者生成新的连接
-				_produceForVip = true;  
-				// cv.notify_all();  ?
-				cv.wait(lock, [&]() -> bool {
-						return _designedForVip == true;
+				_produceForVip = 1;  
+				cv.notify_all();  
+				cv.wait(lock, 
+					[&]() -> bool {
+						return (!_connectQueue.empty()) 
+							&& (_designedForVip == 2);
 					}
 				);
-				_designedForVip = false;
+				_designedForVip = 0;
 			}
 		}
 	}
@@ -177,6 +186,12 @@ shared_ptr<Connection> ConnectionPool::getConnection(AbstractUser* _abUser)
 			_connectQueue.push(pcon);
 		}
 	);   // 取队头
+
+	cout << "用户" << _abUser << "成功申请到了连接" << endl;
+
+	cout << _connectQueue.size() << " " << _designedForVip << " " << _produceForVip << " "
+		<< commonUserDeque.size() << " " << vipUserDeque.size() << endl;
+
 	_connectQueue.pop();  // 然后弹出
 	cv.notify_all();  // 消费后就通知
 
@@ -199,7 +214,7 @@ void ConnectionPool::produceConnectionTask()
 				}
 			);
 		}
-
+		cout << "为vip用户创建新的连接...."  << endl;
 		Connection* p = new Connection();
 		p->connect(_ip, _port, _username, _password, _dbname);
 		// 刷新计时
@@ -209,7 +224,7 @@ void ConnectionPool::produceConnectionTask()
 		_connectionCnt++;
 		
 		_produceForVip = false;
-		_designedForVip = true;
+		_designedForVip = 2;
 
 		cv.notify_all();  // 通知消费者线程，可以消费连接了
 	}

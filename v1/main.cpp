@@ -1,4 +1,5 @@
-﻿#include <iostream>
+﻿#include<iostream>
+#include<vector>
 
 #include"public.h"
 #include"Connection.h"
@@ -9,162 +10,54 @@ using namespace std;
 
 int main()
 {
-    /*Connection conn;
-    char sql[1024] = { 0 };
-    sprintf(sql, "insert into user(name, age, sex) values('%s', '%d', '%s')",
-        "zhang san", 20, "male");
-    conn.connect("127.0.0.1", 3306, "root", "123456", "chat");
-    conn.update(sql);*/
-
-    /* ConnectionPool* cp = ConnectionPool::getConnectionPool();
-     cp->loadConfigFile();*/
-
-    clock_t begin = clock();
+    ConnectionPool* _connectPool = ConnectionPool::getConnectionPool();
+    vector<shared_ptr<CommonUser>> _vecCommonUser;
+    vector<shared_ptr<VipUser>> _vecVipUser;
 
 #if 1
-    thread t1([]() {
-        ConnectionPool* cp = ConnectionPool::getConnectionPool();
-        for (int i = 0; i < 2500; ++i)
-        {
-            /* Connection conn;
-             char sql[1024] = { 0 };
-             sprintf(sql, "insert into user(name, age, sex) values('%s', '%d', '%s')",
-                 "zhang san", 20, "male");
-             conn.connect("127.0.0.1", 3306, "root", "123456", "chat");
-             conn.update(sql);*/
+    vector<thread> _vecThread;
 
-            shared_ptr<Connection> sp = cp->getConnection();
-            char sql[1024] = { 0 };
-            sprintf(sql, "insert into user(name, age, sex) values('%s', '%d', '%s')",
-                "zhang san", 20, "male");
-            sp->update(sql);
-        }
-        });
+    for (int i = 0; i < 30; ++i)
+    {
+        //_vecCommonUser.push_back(shared_ptr<CommonUser>(new CommonUser));
+        _vecVipUser.push_back(shared_ptr<VipUser>(new VipUser));
+    }
+    
+    for (shared_ptr<VipUser>& _pUser: _vecVipUser)
+    {
+        _vecThread.push_back(std::thread([&]()->void {
+                _pUser->toConnect(_connectPool);
+            }
+        ));
+    }
 
-    thread t2([]() {
-        ConnectionPool* cp = ConnectionPool::getConnectionPool();
-        for (int i = 0; i < 2500; ++i)
-        {
-            /* Connection conn;
-             char sql[1024] = { 0 };
-             sprintf(sql, "insert into user(name, age, sex) values('%s', '%d', '%s')",
-                 "zhang san", 20, "male");
-             conn.connect("127.0.0.1", 3306, "root", "123456", "chat");
-             conn.update(sql);*/
-
-            shared_ptr<Connection> sp = cp->getConnection();
-            char sql[1024] = { 0 };
-            sprintf(sql, "insert into user(name, age, sex) values('%s', '%d', '%s')",
-                "zhang san", 20, "male");
-            sp->update(sql);
-        }
-        });
-
-    thread t3([]() {
-        ConnectionPool* cp = ConnectionPool::getConnectionPool();
-        for (int i = 0; i < 2500; ++i)
-        {
-            /* Connection conn;
-             char sql[1024] = { 0 };
-             sprintf(sql, "insert into user(name, age, sex) values('%s', '%d', '%s')",
-                 "zhang san", 20, "male");
-             conn.connect("127.0.0.1", 3306, "root", "123456", "chat");
-             conn.update(sql);*/
-
-            shared_ptr<Connection> sp = cp->getConnection();
-            char sql[1024] = { 0 };
-            sprintf(sql, "insert into user(name, age, sex) values('%s', '%d', '%s')",
-                "zhang san", 20, "male");
-            sp->update(sql);
-        }
-        });
-
-    thread t4([]() {
-        ConnectionPool* cp = ConnectionPool::getConnectionPool();
-        for (int i = 0; i < 2500; ++i)
-        {
-            /* Connection conn;
-             char sql[1024] = { 0 };
-             sprintf(sql, "insert into user(name, age, sex) values('%s', '%d', '%s')",
-                 "zhang san", 20, "male");
-             conn.connect("127.0.0.1", 3306, "root", "123456", "chat");
-             conn.update(sql);*/
-
-            shared_ptr<Connection> sp = cp->getConnection();
-            char sql[1024] = { 0 };
-            sprintf(sql, "insert into user(name, age, sex) values('%s', '%d', '%s')",
-                "zhang san", 20, "male");
-            sp->update(sql);
-        }
-        });
+    for (thread& t : _vecThread)
+    {
+        t.join();
+    }
 
 #endif
 #if 0
-    Connection conn;
-    conn.connect("127.0.0.1", 3306, "root", "123456", "chat");
+    vector<thread> _vecThread;
 
-    thread t1([]() {
-        //ConnectionPool* cp = ConnectionPool::getConnectionPool();
-        for (int i = 0; i < 1250; ++i)
-        {
-            Connection conn;
-            char sql[1024] = { 0 };
-            sprintf(sql, "insert into user(name, age, sex) values('%s', '%d', '%s')",
-                "zhang san", 20, "male");
-            conn.connect("127.0.0.1", 3306, "root", "123456", "chat");
-            conn.update(sql);
-        }
-        });
+    for (int i = 0; i < 30; ++i)
+    {
+        _vecCommonUser.push_back(shared_ptr<CommonUser>(new CommonUser));
+    }
 
-    thread t2([]() {
-        //ConnectionPool* cp = ConnectionPool::getConnectionPool();
-        for (int i = 0; i < 1250; ++i)
-        {
-            Connection conn;
-            char sql[1024] = { 0 };
-            sprintf(sql, "insert into user(name, age, sex) values('%s', '%d', '%s')",
-                "zhang san", 20, "male");
-            conn.connect("127.0.0.1", 3306, "root", "123456", "chat");
-            conn.update(sql);
-        }
-        });
+    for (shared_ptr<CommonUser>& _pUser : _vecCommonUser)
+    {
+        _vecThread.push_back(std::thread([&]()->void {
+            _pUser->toConnect(_connectPool);
+            }
+        ));
+    }
 
-    thread t3([]() {
-        //ConnectionPool* cp = ConnectionPool::getConnectionPool();
-        for (int i = 0; i < 1250; ++i)
-        {
-            Connection conn;
-            char sql[1024] = { 0 };
-            sprintf(sql, "insert into user(name, age, sex) values('%s', '%d', '%s')",
-                "zhang san", 20, "male");
-            conn.connect("127.0.0.1", 3306, "root", "123456", "chat");
-            conn.update(sql);
-        }
-        });
-
-    thread t4([]() {
-        //ConnectionPool* cp = ConnectionPool::getConnectionPool();
-        for (int i = 0; i < 1250; ++i)
-        {
-            Connection conn;
-            char sql[1024] = { 0 };
-            sprintf(sql, "insert into user(name, age, sex) values('%s', '%d', '%s')",
-                "zhang san", 20, "male");
-            conn.connect("127.0.0.1", 3306, "root", "123456", "chat");
-            conn.update(sql);
-        }
-        });
+    for (thread& t : _vecThread)
+    {
+        t.join();
+    }
 #endif
-
-
-    t1.join();
-    t2.join();
-    t3.join();
-    t4.join();
-
-    clock_t end = clock();
-
-    cout << (end - begin) << "ms" << endl;
 
     return 0;
 }

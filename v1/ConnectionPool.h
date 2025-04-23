@@ -51,8 +51,7 @@ private:
 
 	deque<CommonUser*> commonUserDeque;  // 普通用户的排队列表
 	deque<VipUser*> vipUserDeque;  // vip用户的排队列表
-	atomic_bool _designedForVip;  // 判断是否是为vip专门生产的连接
+	atomic_int _designedForVip;  // 判断是否是为vip专门生产的连接
 
 	atomic_bool _produceForVip;  // 判断是否在(initSize, maxSize)条件下发来的请求
-
 };

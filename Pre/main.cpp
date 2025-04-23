@@ -615,7 +615,7 @@ int main()
 
 #endif
 // ###### 其他测试5 #################################################################
-#if 1
+#if 0
 class A
 {
 public:
@@ -634,6 +634,51 @@ int main()
 {
 	B b;
 	b.show();
+	return 0;
+}
+#endif
+// ###### 其他测试6 #################################################################
+#if 1
+#include<thread>
+#include<mutex>
+#include<condition_variable>
+#include<vector>
+
+std::mutex mtx;
+std::condition_variable cv;
+
+void threadHandle(int idx)
+{
+	unique_lock<mutex> lck(mtx);
+	// 若满足true，直接返回（无等待）
+	//cv.wait(lck, [] { return true; });
+	cv.wait(lck);
+
+	cout << "线程" << idx << "被唤醒" << endl;
+
+	std::this_thread::sleep_for(std::chrono::seconds(2));
+}
+
+int main()
+{
+	vector<thread> vec;
+	for (int i = 1; i <= 10; i++)
+	{
+		vec.push_back(std::thread(threadHandle, i));
+	}
+
+	std::this_thread::sleep_for(std::chrono::seconds(2));
+	cout << "main即将notify" << endl;
+	std::this_thread::sleep_for(std::chrono::seconds(2));
+
+	// 唤醒顺序疑似随机
+	cv.notify_all();
+
+	for (thread& t : vec)
+	{
+		t.join();
+	}
+
 	return 0;
 }
 #endif

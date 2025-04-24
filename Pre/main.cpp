@@ -684,18 +684,39 @@ int main()
 #endif
 // ###### 其他测试7 #################################################################
 #if 1
+#include<thread>
+#include<mutex>
+#include<condition_variable>
+
+std::mutex mtx;
+std::condition_variable cv;
+
+void threadHandle01()
+{
+	unique_lock<std::mutex> lck(mtx);
+	// 进入的时候就会先判断一次条件，如果条件成立，就直接返回
+	// 在等待状态下被唤醒会判断条件，如果成立，就拿着锁返回
+	cv.wait(lck,
+		[&]() -> bool {
+			cout << "pdcHelloWorld" << endl;
+			return true;
+		}
+	);
+}
+
 int main()
 {
-	shared_ptr<int> ptr(new int(10),
+	/*shared_ptr<int> ptr(new int(10),
 		[](int* p) -> void {
 			cout << "pdcHelloWorld" << endl;
 			delete p;
 		}
 	);
 	ptr.reset();
-	ptr = nullptr;
+	ptr = nullptr;*/
+	thread t1(threadHandle01);
 
-	system("pause");
+	t1.join();
 }
 
 #endif

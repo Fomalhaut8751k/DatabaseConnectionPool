@@ -26,7 +26,10 @@ public:
 	clock_t getAliceTime() const;
 
 	// 长时间未操作的超时回收
-	void timeoutRecycleConnect();
+	void timeoutRecycleConnect(ConnectionPool* _connectionPool);
+
+	// 用户行为
+	void userBehavior();
 
 	virtual void show();
 
@@ -34,6 +37,7 @@ protected:
 	shared_ptr<Connection> _Connection;
 	clock_t _alivetime;  // 记录进入用户不操作时间
 	int _timeOut;
+	std::mutex _userMtx;
 };
 
 // 普通用户

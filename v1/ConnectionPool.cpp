@@ -132,16 +132,12 @@ shared_ptr<Connection> ConnectionPool::getConnection(AbstractUser* _abUser)
 		// 只判断一次，没有就排队
 		if (_connectQueue.empty())  
 		{
-			cout << "_produceForVip: " << _produceForVip << " "
-				<< "_designedForVip: " << _designedForVip << " "
-				<< "_connectQueue.size():" << _connectQueue.size() << " "
-				<< "_connectionCnt: " << _connectionCnt << endl;
-
 			commonUserDeque.push_back(dynamic_cast<CommonUser*>(_abUser));
 
 			cout << "用户" << _abUser << "正在排队中......"
 				<< "前面还有" << vipUserDeque.size() + commonUserDeque.size() << "人" << endl;
 			_priorUser = true;
+			cv.notify_all();
 			cv.wait(lock, [&]() -> bool {
 				// 有空闲连接 -> vip通道没有人在排队 -> 我是队头
 				return (!_connectQueue.empty())
@@ -159,13 +155,6 @@ shared_ptr<Connection> ConnectionPool::getConnection(AbstractUser* _abUser)
 
 		if (_connectQueue.empty())
 		{
-			cout << "\n_produceForVip: " << _produceForVip << " "
-				<< "_designedForVip: " << _designedForVip << " "
-				<< "_connectQueue.size():" << _connectQueue.size() << " "
-				<< "_connectionCnt: " << _connectionCnt << "/" << _maxSize << " "
-				<< "vipUserDeque.size(): " << vipUserDeque.size() << endl;
-				
-
 			// 如果已经超过了maxSize，即使是vip也得乖乖排队
 			if (_connectionCnt >= _maxSize)
 			{
@@ -180,6 +169,8 @@ shared_ptr<Connection> ConnectionPool::getConnection(AbstractUser* _abUser)
 
 				_priorUser = true;
 
+				cv.notify_all();
+
 				cv.wait(lock, 
 					[&]() -> bool {
 					// 优先级：有空闲连接 -> 我是队头
@@ -193,7 +184,6 @@ shared_ptr<Connection> ConnectionPool::getConnection(AbstractUser* _abUser)
 			// 如果没有超过，可以为vip用户申请专属的连接
 			else
 			{
-				cout << "pdcHelloWorld" << endl;
 				// 等待生产者生成新的连接
 				_produceForVip = true;
 				_designedForVip = 1;
@@ -211,11 +201,15 @@ shared_ptr<Connection> ConnectionPool::getConnection(AbstractUser* _abUser)
 
 	shared_ptr<Connection> sp(_connectQueue.front(),
 		[&](Connection* pcon) { 
-			unique_lock<mutex> lock(_queueMutex);
-			// 刷新计时
-			pcon->refreshAliveTime();
+			{
+				unique_lock<mutex> lock(_queueMutex);
+				// 刷新计时
+				pcon->refreshAliveTime();
 
-			_connectQueue.push(pcon);
+				_connectQueue.push(pcon);
+			}
+			// 有了空连接之后就应该....
+			cv.notify_all();
 		}
 	);   // 取队头
 
@@ -234,19 +228,19 @@ void ConnectionPool::produceConnectionTask()
 	for (;;)
 	{
 		unique_lock<mutex> lock(_queueMutex);
-
 		// 队列不空，此处生产线程进入等待状态，等待指定条件满足并被唤醒
+
 		while (!_connectQueue.empty())
 		{
+			_designedForVip = 2;
+			cv.notify_all();
 			cv.wait(lock, [&]() -> bool {
 					// 只响应在可创建条件下的vip用户的创建请求
-					return _produceForVip == true;
+					return (_produceForVip == true)
+						&& (_designedForVip == 1);
 				}
 			);
 		}
-		cout << "_produceForVip: " << _produceForVip << " "
-			<< "_designedForVip: " << _designedForVip << endl;
-
 		cout << "为vip用户创建新的连接...."  << endl;
 		Connection* p = new Connection();
 		p->connect(_ip, _port, _username, _password, _dbname);
@@ -257,7 +251,8 @@ void ConnectionPool::produceConnectionTask()
 		_connectionCnt++;
 		
 		_produceForVip = false;
-		_designedForVip = 2;
+		
+		/*_designedForVip = 2;*/
 
 		cv.notify_all();  // 通知消费者线程，可以消费连接了
 	}
@@ -275,7 +270,8 @@ void ConnectionPool::recycleConnectionTask()
 		this_thread::sleep_for(chrono::seconds(_maxIdleTime));
 		// 扫描整个队列，释放多余的连接
 		unique_lock<mutex> lock(_queueMutex);
-		while (_connectionCnt > _initSize)  // 依然是从头开始删
+		
+		while ((_connectionCnt > _initSize) && (!_connectQueue.empty()))  // 依然是从头开始删
 		{
 			Connection* p = _connectQueue.front();
 			if (p->getAliceTime() >= (_maxIdleTime * 1000))

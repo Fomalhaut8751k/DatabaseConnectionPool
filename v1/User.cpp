@@ -10,8 +10,6 @@
 
 using namespace std;
 
-//std::mutex mtx;
-
 AbstractUser::AbstractUser() :
 	_Connection(nullptr),
 	_alivetime(clock()),
@@ -26,12 +24,13 @@ void AbstractUser::toConnect(ConnectionPool* _pConnectPool)
 	_Connection = _pConnectPool->getConnection(this);
 	if (_Connection != nullptr)
 	{
-		thread t(bind(&AbstractUser::timeoutRecycleConnect, this));
-		t.detach();
+		update();
+		thread t1(bind(&AbstractUser::timeoutRecycleConnect, this, _pConnectPool));
+		t1.join();
 	}
 }
 
-// 用户行为一
+// 细分用户行为一
 void AbstractUser::update()
 {
 	// 触发一次事件，更新一下时间
@@ -58,22 +57,33 @@ clock_t AbstractUser::getAliceTime() const
 }
 
 // 长时间未操作的超时回收
-void AbstractUser::timeoutRecycleConnect()
+void AbstractUser::timeoutRecycleConnect(ConnectionPool* _connectionPool)
 {	
 	for (;;)
 	{
 		std::this_thread::sleep_for(std::chrono::milliseconds(100));
 		if (getAliceTime() >= 10 * 1000)
 		{
-			//lock_guard<mutex> lck(mtx);
-			cout << "用户" << this << "长时间没有操作，已回收连接\n";
-			// 调用其删除器，归还连接
+			{
+				unique_lock<mutex> lck(_connectionPool->_queueMutex);
+				// 调用其删除器，归还连接
+				cout << "用户" << this << "长时间没有操作，已回收连接" <<
+					"连接池中还剩: " << _connectionPool->_connectQueue.size() + 1
+					<< "个空闲连接 " << endl;
+			}
 			_Connection.reset();
 			_Connection = nullptr;
 			break;
 		}
 	}
+	//cout << "pdcHelloWorld" << endl;
 }
+
+void AbstractUser::userBehavior()
+{
+	
+}
+
 
 void AbstractUser::show()
 {

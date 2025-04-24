@@ -17,7 +17,7 @@ int main()
 #if 1
     vector<thread> _vecThread;
 
-    for (int i = 0; i < 30; ++i)
+    for (int i = 0; i < 50; ++i)
     {
         //_vecCommonUser.push_back(shared_ptr<CommonUser>(new CommonUser));
         _vecVipUser.push_back(shared_ptr<VipUser>(new VipUser));
@@ -35,6 +35,8 @@ int main()
     {
         t.join();
     }
+
+    std::this_thread::sleep_for(std::chrono::seconds(100));
 
 #endif
 #if 0

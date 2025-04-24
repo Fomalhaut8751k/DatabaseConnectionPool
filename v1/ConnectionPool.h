@@ -21,6 +21,10 @@ public:
 	// 给外部提供接口从连接池中获取一个空闲连接
 	shared_ptr<Connection> getConnection(AbstractUser* _abUser);
 
+	queue<Connection*> _connectQueue;  // 存储mysql连接的队列
+	atomic_bool _priorUser;
+	mutex _queueMutex;  // 维护连接队列的线程安全互斥锁
+
 private:
 	ConnectionPool();
 	ConnectionPool(const ConnectionPool&) = delete;
@@ -42,8 +46,8 @@ private:
 	int _maxIdleTime;  // 连接池最大空闲时间
 	//int _connectionTimeout;  // 连接池获取连接的超时时间
 
-	queue<Connection*> _connectQueue;  // 存储mysql连接的队列
-	mutex _queueMutex;  // 维护连接队列的线程安全互斥锁
+	
+	
 	atomic_int _connectionCnt;  // 记录连接所创建的connection连接的总数量
 	condition_variable cv;  // 设置条件变量，用于连接生产线程和链接消费线程的通信
 
@@ -52,5 +56,5 @@ private:
 	atomic_int _designedForVip;  // 判断是否是为vip专门生产的连接
 
 	atomic_bool _produceForVip;  // 判断是否在(initSize, maxSize)条件下发来的请求
-	atomic_bool _priorUser; 
+	
 };

@@ -133,9 +133,9 @@ shared_ptr<Connection> ConnectionPool::getConnection(AbstractUser* _abUser)
 		if (_connectQueue.empty())  
 		{
 			commonUserDeque.push_back(dynamic_cast<CommonUser*>(_abUser));
-
-			cout << "用户" << _abUser << "正在排队中......"
-				<< "前面还有" << vipUserDeque.size() + commonUserDeque.size() << "人" << endl;
+			cout << "【广播】";
+			cout << "用户" << _abUser << ":\n——正在排队中......"
+				<< "前面还有" << vipUserDeque.size() + commonUserDeque.size() << "人\n" << endl;
 			_priorUser = true;
 			cv.notify_all();
 			cv.wait(lock, [&]() -> bool {
@@ -159,8 +159,9 @@ shared_ptr<Connection> ConnectionPool::getConnection(AbstractUser* _abUser)
 			if (_connectionCnt >= _maxSize)
 			{
 				vipUserDeque.push_back(dynamic_cast<VipUser*>(_abUser));
-				cout << "用户" << _abUser << "正在排队中......正在为您开启vip通道，"
-					<< "前面还有" << vipUserDeque.size() - 1 << "人" << endl;
+				cout << "【广播】";
+				cout << "用户" << _abUser << "(VIP):\n——正在排队中......为您开启vip通道，"
+					<< "前面还有" << vipUserDeque.size() - 1 << "人\n" << endl;
 				
 				//for (VipUser* vu : vipUserDeque)
 				//{
@@ -214,10 +215,16 @@ shared_ptr<Connection> ConnectionPool::getConnection(AbstractUser* _abUser)
 	);   // 取队头
 
 	if (dynamic_cast<CommonUser*>(_abUser) != nullptr)
-		cout << "用户" << _abUser << "成功申请到了连接" << endl;
+	{
+		cout << "【广播】";
+		cout << "用户" << _abUser << ":\n——成功申请到了连接\n" << endl;
+	}
 	else
-		cout << "vip用户" << _abUser << "成功申请到了连接" << endl;
-
+	{
+		cout << "【广播】";
+		cout << "用户" << _abUser << "(VIP):\n——成功申请到了连接\n" << endl;
+	}
+		
 	_priorUser = true;
 	_connectQueue.pop();  // 然后弹出
 	cv.notify_all();  // 消费后就通知
@@ -244,7 +251,8 @@ void ConnectionPool::produceConnectionTask()
 				}
 			);
 		}
-		cout << "为vip用户创建新的连接...."  << endl;
+		cout << "【广播】";
+		cout << "系统:\n——为vip用户创建新的连接....\n"  << endl;
 		Connection* p = new Connection();
 		p->connect(_ip, _port, _username, _password, _dbname);
 		// 刷新计时
@@ -281,8 +289,9 @@ void ConnectionPool::recycleConnectionTask()
 			{
 				_connectQueue.pop();
 				_connectionCnt--;
-				cout << "有连接超时将被释放，目前连接池还剩下" << _connectQueue.size() 
-					<< "个" << endl;
+				cout << "【广播】";
+				cout << "系统:\n——有连接超时将被释放，目前连接池还剩下" 
+					<< _connectQueue.size() << "个\n" << endl;
 				delete p;  // 释放连接
 			}
 			else

@@ -57,8 +57,8 @@ clock_t AbstractUser::getAliceTime() const
 }
 
 // 长时间未操作的超时回收
-void AbstractUser::timeoutRecycleConnect(ConnectionPool* _connectionPool)
-{	
+void CommonUser::timeoutRecycleConnect(ConnectionPool* _connectionPool)
+{
 	for (;;)
 	{
 		std::this_thread::sleep_for(std::chrono::milliseconds(100));
@@ -67,9 +67,12 @@ void AbstractUser::timeoutRecycleConnect(ConnectionPool* _connectionPool)
 			{
 				unique_lock<mutex> lck(_connectionPool->_queueMutex);
 				// 调用其删除器，归还连接
-				cout << "用户" << this << "长时间没有操作，已回收连接，" <<
-					"连接池中还剩: " << _connectionPool->_connectQueue.size() + 1
-					<< "个空闲连接 " << endl;
+				cout << "【广播】";
+				cout << "用户" << this << "\n——长时间没有操作，已回收连接\n" << endl;
+				cout << "【广播】";
+				cout << "系统" << ":\n——有连接被回收，目前连接池中还剩: "
+					<< _connectionPool->_connectQueue.size() + 1
+					<< "个空闲连接\n" << endl;
 			}
 			_Connection.reset();
 			_Connection = nullptr;
@@ -77,18 +80,36 @@ void AbstractUser::timeoutRecycleConnect(ConnectionPool* _connectionPool)
 			break;
 		}
 	}
-	//cout << "pdcHelloWorld" << endl;
+}
+
+void VipUser::timeoutRecycleConnect(ConnectionPool* _connectionPool)
+{
+	for (;;)
+	{
+		std::this_thread::sleep_for(std::chrono::milliseconds(100));
+		if (getAliceTime() >= 10 * 1000)
+		{
+			{
+				unique_lock<mutex> lck(_connectionPool->_queueMutex);
+				// 调用其删除器，归还连接
+				cout << "【广播】";
+				cout << "用户" << this << "(VIP):\n——长时间没有操作，已回收连接\n" << endl;
+				cout << "【广播】";
+				cout << "系统"  << ":\n——有连接被回收，目前连接池中还剩: " 
+					<< _connectionPool->_connectQueue.size() + 1
+					<< "个空闲连接\n" << endl;
+			}
+			_Connection.reset();
+			_Connection = nullptr;
+			_connectionPool->_designedForVip = 0;
+			break;
+		}
+	}
 }
 
 void AbstractUser::userBehavior()
 {
 	
-}
-
-
-void AbstractUser::show()
-{
-	cout << "pdcHelloWorld" << endl;
 }
 
 CommonUser::CommonUser():

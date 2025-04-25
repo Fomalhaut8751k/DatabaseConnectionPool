@@ -26,12 +26,10 @@ public:
 	clock_t getAliceTime() const;
 
 	// 长时间未操作的超时回收
-	void timeoutRecycleConnect(ConnectionPool* _connectionPool);
+	virtual void timeoutRecycleConnect(ConnectionPool* _connectionPool) = 0;
 
 	// 用户行为
 	void userBehavior();
-
-	virtual void show();
 
 protected:
 	shared_ptr<Connection> _Connection;
@@ -45,6 +43,8 @@ class CommonUser : public AbstractUser
 {
 public:
 	CommonUser();
+
+	void timeoutRecycleConnect(ConnectionPool* _connectionPool);
 };
 
 
@@ -53,4 +53,6 @@ class VipUser : public AbstractUser
 {
 public:
 	VipUser();
+
+	void timeoutRecycleConnect(ConnectionPool* _connectionPool);
 };

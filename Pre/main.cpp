@@ -683,7 +683,7 @@ int main()
 }
 #endif
 // ###### 其他测试7 #################################################################
-#if 1
+#if 0
 #include<thread>
 #include<mutex>
 #include<condition_variable>
@@ -718,5 +718,56 @@ int main()
 
 	t1.join();
 }
+#endif
+// ###### 其他测试8 #################################################################
+#if 1
+/*
+	多态的应用
+*/
+#include<thread>
+#include<functional>
+#include<memory>
 
+class AbstractUser
+{
+public:
+	void toConnect()
+	{
+		thread t(&AbstractUser::threadHandle, this);  
+		t.join();
+	}
+
+	virtual void threadHandle() = 0;  // 1. 虚函数
+};
+
+class CommonUser : public AbstractUser
+{
+public:
+	void threadHandle()
+	{
+		cout << "普通用户: pdcHelloWorld" << endl;
+		std::this_thread::sleep_for(std::chrono::seconds(5));
+	}
+};
+
+class VipUser : public AbstractUser
+{
+public:
+	void threadHandle()  // 2. 子类重写父类的虚函数
+	{
+		cout << "vip用户: pdcHelloWorld" << endl;
+		std::this_thread::sleep_for(std::chrono::seconds(5));
+	}
+};
+
+int main()
+{
+	shared_ptr<AbstractUser> _ptr1(new VipUser);
+	_ptr1->toConnect();
+
+	shared_ptr<AbstractUser> _ptr2(new CommonUser);
+	_ptr2->toConnect();
+
+	return 0;
+}
 #endif

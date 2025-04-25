@@ -162,10 +162,10 @@ shared_ptr<Connection> ConnectionPool::getConnection(AbstractUser* _abUser)
 				cout << "用户" << _abUser << "正在排队中......正在为您开启vip通道，"
 					<< "前面还有" << vipUserDeque.size() - 1 << "人" << endl;
 				
-				for (VipUser* vu : vipUserDeque)
-				{
-					cout << vu << " ";
-				}cout << endl;
+				//for (VipUser* vu : vipUserDeque)
+				//{
+				//	cout << vu << " ";
+				//}cout << endl;
 
 				_priorUser = true;
 
@@ -213,7 +213,10 @@ shared_ptr<Connection> ConnectionPool::getConnection(AbstractUser* _abUser)
 		}
 	);   // 取队头
 
-	cout << "用户" << _abUser << "成功申请到了连接" << endl;
+	if (dynamic_cast<CommonUser*>(_abUser) != nullptr)
+		cout << "用户" << _abUser << "成功申请到了连接" << endl;
+	else
+		cout << "vip用户" << _abUser << "成功申请到了连接" << endl;
 
 	_priorUser = true;
 	_connectQueue.pop();  // 然后弹出
@@ -278,7 +281,8 @@ void ConnectionPool::recycleConnectionTask()
 			{
 				_connectQueue.pop();
 				_connectionCnt--;
-				cout << "有连接超时将被释放" << endl;
+				cout << "有连接超时将被释放，目前连接池还剩下" << _connectQueue.size() 
+					<< "个" << endl;
 				delete p;  // 释放连接
 			}
 			else

@@ -67,12 +67,13 @@ void AbstractUser::timeoutRecycleConnect(ConnectionPool* _connectionPool)
 			{
 				unique_lock<mutex> lck(_connectionPool->_queueMutex);
 				// 调用其删除器，归还连接
-				cout << "用户" << this << "长时间没有操作，已回收连接" <<
+				cout << "用户" << this << "长时间没有操作，已回收连接，" <<
 					"连接池中还剩: " << _connectionPool->_connectQueue.size() + 1
 					<< "个空闲连接 " << endl;
 			}
 			_Connection.reset();
 			_Connection = nullptr;
+			_connectionPool->_designedForVip = 0;
 			break;
 		}
 	}

@@ -727,6 +727,7 @@ int main()
 #include<thread>
 #include<functional>
 #include<memory>
+#include<deque>
 
 class AbstractUser
 {
@@ -762,11 +763,19 @@ public:
 
 int main()
 {
-	shared_ptr<AbstractUser> _ptr1(new VipUser);
+	/*shared_ptr<AbstractUser> _ptr1(new VipUser);
 	_ptr1->toConnect();
 
 	shared_ptr<AbstractUser> _ptr2(new CommonUser);
-	_ptr2->toConnect();
+	_ptr2->toConnect();*/
+
+	deque<int> deq;
+	bool label = false;
+	if (label && deq.front() == 0)
+	{
+		cout << "pdcHelloWorld";
+
+	}
 
 	return 0;
 }

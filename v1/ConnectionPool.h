@@ -16,10 +16,15 @@ class ConnectionPool
 public:
 	// 获取连接池对象实例
 	static ConnectionPool* getConnectionPool();
+
 	// 从配置文件中加载配置项
 	bool loadConfigFile();
+
 	// 给外部提供接口从连接池中获取一个空闲连接
 	shared_ptr<Connection> getConnection(AbstractUser* _abUser);
+
+	// 删除deque中已经决定退出排队的用户
+	void deleteFromDeque(AbstractUser* _abUser);
 
 	queue<Connection*> _connectQueue;  // 存储mysql连接的队列
 	atomic_bool _priorUser;
@@ -52,8 +57,8 @@ private:
 
 	deque<CommonUser*> commonUserDeque;  // 普通用户的排队列表
 	deque<VipUser*> vipUserDeque;  // vip用户的排队列表
-	
+
 
 	atomic_bool _produceForVip;  // 判断是否在(initSize, maxSize)条件下发来的请求
-	
+
 };

@@ -31,6 +31,12 @@ public:
 	// 用户行为
 	void userBehavior();
 
+	// 用户等待标记
+	atomic_bool _waiting;
+
+	// 线程终止标记
+	atomic_bool _terminate;
+
 protected:
 	shared_ptr<Connection> _Connection;
 	clock_t _alivetime;  // 记录进入用户不操作时间

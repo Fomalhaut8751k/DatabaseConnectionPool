@@ -13,7 +13,9 @@ using namespace std;
 AbstractUser::AbstractUser() :
 	_Connection(nullptr),
 	_alivetime(clock()),
-	_timeOut(10)
+	_timeOut(10),
+	_waiting(false),
+	_terminate(false)
 {
 
 }
@@ -21,13 +23,41 @@ AbstractUser::AbstractUser() :
 // 用户发起连接请求
 void AbstractUser::toConnect(ConnectionPool* _pConnectPool)
 {
-	_Connection = _pConnectPool->getConnection(this);
+	//_Connection = _pConnectPool->getConnection(this);
+	thread t0(
+		[&]() -> void {
+			_Connection = _pConnectPool->getConnection(this);
+		}
+	);
+	while (_Connection == nullptr)
+	{
+		// 如果用户确实在等待
+		unique_lock<std::mutex> lck(_pConnectPool->_queueMutex);
+		if (_waiting)
+		{
+			int choice = rand() % 50 + 1;
+			// 模拟2%的概率用户选择退出排队
+			if (choice <= 1) 
+			{
+				this->_terminate = true;
+				_pConnectPool->deleteFromDeque(this);
+				
+				_Connection.reset();
+				_Connection == nullptr;
+				break;
+			}
+			std::this_thread::sleep_for(std::chrono::milliseconds(500));
+		}
+		// 如果申请到连接了还没有退出排队
+	}
 	if (_Connection != nullptr)
 	{
 		update();
 		thread t1(bind(&AbstractUser::timeoutRecycleConnect, this, _pConnectPool));
 		t1.join();
 	}
+	t0.join();
+	
 }
 
 // 细分用户行为一

@@ -10,6 +10,8 @@ using namespace std;
 
 int main()
 {
+    srand((unsigned)time(NULL));
+
     ConnectionPool* _connectPool = ConnectionPool::getConnectionPool();
     vector<shared_ptr<CommonUser>> _vecCommonUser;
     vector<shared_ptr<VipUser>> _vecVipUser;
@@ -63,7 +65,6 @@ int main()
 #endif
 // ###### 普通用户和vip用户 ###############################################################
 #if 1
-    srand((unsigned)time(NULL));
     vector<int> _vecUserType;
 
     for (int i = 0; i < 60; ++i)

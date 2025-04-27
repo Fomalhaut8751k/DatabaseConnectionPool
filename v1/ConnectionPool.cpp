@@ -137,13 +137,18 @@ shared_ptr<Connection> ConnectionPool::getConnection(AbstractUser* _abUser)
 			cout << "用户" << _abUser << ":\n——正在排队中......"
 				<< "前面还有" << vipUserDeque.size() + commonUserDeque.size() << "人\n" << endl;
 			_priorUser = true;
+
 			cv.notify_all();
+			_abUser->_waiting = true;  // 表示用户处于等待状态
+
 			cv.wait(lock, [&]() -> bool {
 				// 有空闲连接 -> vip通道没有人在排队 -> 我是队头
-				return (!_connectQueue.empty())
-					&& vipUserDeque.empty()
-					&& commonUserDeque.front() == _abUser
-					&& (_designedForVip == 0);
+				return (_abUser->_terminate == true) || (
+						(!_connectQueue.empty())
+						&& vipUserDeque.empty()
+						&& commonUserDeque.front() == _abUser
+						&& (_designedForVip == 0)
+					);
 				}
 			);
 			// 三个条件不满足就一直等，直到都满足
@@ -162,21 +167,19 @@ shared_ptr<Connection> ConnectionPool::getConnection(AbstractUser* _abUser)
 				cout << "【广播】";
 				cout << "用户" << _abUser << "(VIP):\n——正在排队中......为您开启vip通道，"
 					<< "前面还有" << vipUserDeque.size() - 1 << "人\n" << endl;
-				
-				//for (VipUser* vu : vipUserDeque)
-				//{
-				//	cout << vu << " ";
-				//}cout << endl;
 
 				_priorUser = true;
 
 				cv.notify_all();
+				_abUser->_waiting = true;  // 表示用户处于等待状态
 
 				cv.wait(lock, 
 					[&]() -> bool {
 					// 优先级：有空闲连接 -> 我是队头
-						return (!_connectQueue.empty())
-							&& vipUserDeque.front() == _abUser;
+						return (_abUser->_terminate == true) || (
+								(!_connectQueue.empty())
+								&& vipUserDeque.front() == _abUser
+							);
 					}
 				);
 				// 两个条件不满足就一直等，直到都满足
@@ -198,6 +201,11 @@ shared_ptr<Connection> ConnectionPool::getConnection(AbstractUser* _abUser)
 				_designedForVip = 0;
 			}
 		}
+	}
+
+	if (_abUser->_terminate)
+	{
+		return nullptr;
 	}
 
 	shared_ptr<Connection> sp(_connectQueue.front(),
@@ -300,4 +308,44 @@ void ConnectionPool::recycleConnectionTask()
 			}
 		}
 	}
+}
+
+void ConnectionPool::deleteFromDeque(AbstractUser* _abUser)
+{
+	//unique_lock<std::mutex> lck(_queueMutex);
+
+	if (dynamic_cast<CommonUser*>(_abUser) != nullptr)
+	{
+		CommonUser* _user = dynamic_cast<CommonUser*>(_abUser);
+		deque<CommonUser*>::iterator it = std::find(commonUserDeque.begin(), commonUserDeque.end(), _user);
+		if (it != commonUserDeque.end())
+		{
+			commonUserDeque.erase(it);
+			cout << "【广播】";
+			cout << "用户 " << _abUser << ":\n——退出了排队, 用户队列还有: " << commonUserDeque.size()
+				<< "\n" << endl;
+		}
+		else
+		{
+			throw "Error: This user is not in the queue";
+		}
+	}
+	else
+	{
+		VipUser* _user = dynamic_cast<VipUser*>(_abUser);
+		deque<VipUser*>::iterator it = std::find(vipUserDeque.begin(), vipUserDeque.end(), _user);
+		if (it != vipUserDeque.end())
+		{
+			vipUserDeque.erase(it);
+			cout << "【广播】";
+			cout << "用户" << _abUser << "(VIP):\n——退出了排队，VIP用户队列还有: " << vipUserDeque.size() << endl;
+		}
+		else
+		{
+			cout << "pdcHelloWorld" << endl;
+			throw "Error: This user is not in the queue";
+		}
+	}
+	cv.notify_all();
+
 }

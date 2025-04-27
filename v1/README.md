@@ -43,21 +43,23 @@ MySQL数据库编程、单例模式、queue队列容器、C++11多线程编程�
 - 8.连接的生产和连接的消费采用生产者-消费者线程模型来设计，使用了线程间的同步通信机制条件变量和互斥锁。
 
 
-## 4. 主要功能点的分析
+## 4. 主要功能点和问题分析
+- ### 不同阶段的连接申请和排队
 
-- **阶段一：**
+    > **阶段一：**
     
+
     连接池_connectQueue中的连接加上被申请走的连接数量等于initSize, 如果此时_connectQueue中还有空闲连接，那么无论是普通用户还是vip用户都可以直接申请里面的连接。如果_connectQueue中的连接空了，就进入第二阶段。
 
-- **阶段二：**
+    > **阶段二：**
 
     此时总的连接数小于maxSize，普通用户想再申请连接，就要**排队**，而vip用户想要再申请连接，可以让生产者生产额外的连接，但是总的数量不能超过maxSize。当总的数量大于等于maxSize时，就进入第三阶段。
 
-- **阶段三：**
+    > **阶段三：**
 
     此时总的连接数大于等于maxSize，即使是vip用户，也得进行排队。
 
-- **排队机制：**
+     **排队机制：**
 
     在ConnectionPool中设置两个双端队列deque: 
     ```cpp
@@ -112,9 +114,7 @@ MySQL数据库编程、单例模式、queue队列容器、C++11多线程编程�
 
 		cv.notify_all(); 
         ```
-
-
-## 5. 问题解决
+<br>
 
 - ### 线程池先创建，并启动生产者线程。随后用户开始申请连接，当需要生产者为vip用户创建新的连接时：
     ```cpp
@@ -363,6 +363,69 @@ MySQL数据库编程、单例模式、queue队列容器、C++11多线程编程�
 	_connectionPool->_designedForVip = 0;
     // #############################################
     ```
+
+<br>
+
+- ### 退出排队机制的引入
+
+    用户可以在自己排队的时候手动选择退出排队，这时，它的名字将在对应的连接池对应的排队队列中删去。
+
+    - 首先把获取连接设置在一个独立的线程中：
+        ```cpp
+        thread t0(
+		    [&]() -> void {
+			    _Connection = _pConnectPool->getConnection(this);
+		    }
+	    );
+        ```
+        如果不设置为一个单独的线程，那么顺序执行，就会等到getConnection()执行完成才往下执行，即已经申请到内存了。如果用户发出排队退出的请求，则需要直接终止线程t0。
+
+        这样的话，超时重连线程的启动也需要进行一定的修改：timeoutRecycleConnect()
+
+        首先，~~_Connection不为nullptr时，肯定是已经申请到了连接；_Connection为nullptr，且_waiting为true，说明用户在排队；如果_Connection为nullptr，且_waiting为false？~~
+
+        不能只用_Connection去判断，因为对于vip用户，_Connection为nullptr的情况下可能是在等生产者生产连接，而不是在排队。因此应该用_waiting来判断。_waiting只有在开始排队前才会设置为true，而排队结束后_waiting的值也不影响其他。
+        ```cpp
+        while (_Connection == nullptr)
+        {
+            // 如果用户确实在等待
+            if (_waiting)
+            {
+                int choice = rand() % 20 + 1;
+                // 模拟5%的概率用户选择退出排队
+                if (choice <= 1) 
+                {
+                    ......
+                }
+                std::this_thread::sleep_for(std::chrono::milliseconds(200));
+            }
+            // 如果申请到连接了还没有退出排队，while循环就会停止，往下执行，开始超时回收连接的判定。
+        }
+        if (_Connection != nullptr)
+        {
+            ......
+        }
+        ```
+
+        同时，当执行退出排队相关函数时，也要把getConnection()和timeoutRecycleConnect()对应的线程关闭，这可以通过一些标志来实现。例如，当设置label=true时终止getConnection()，可以在唤醒条件中如:
+        ```cpp
+        [&]() -> bool {
+            return (label == true) ||
+                   ((!_connectQueue.empty()
+                && vipUserDeque.front() == _abUser));
+        }
+        if(label)
+        {
+            return;
+        }
+        ```
+        按照从左到右的顺序，如果label==true，那么或的另一个条件就不需要判断了，或的结果一定是true，因此可以把进程唤醒，同时避免了删除唯一一个排队的用户后需要访问UserDeque.front()而报错。
+
+        但是还有一个棘手的问题：用户端的主进程的notify_all()如何准确找到它对应的
+        getConnection()子进程——**把标志设置为成员变量**。
+
+        
+
 
 <br>
 

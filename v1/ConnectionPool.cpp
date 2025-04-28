@@ -135,7 +135,22 @@ shared_ptr<Connection> ConnectionPool::getConnection(AbstractUser* _abUser)
 			commonUserDeque.push_back(dynamic_cast<CommonUser*>(_abUser));
 			cout << "【广播】";
 			cout << "用户" << _abUser << ":\n——正在排队中......"
-				<< "前面还有" << vipUserDeque.size() + commonUserDeque.size() << "人\n" << endl;
+				<< "前面还有" << vipUserDeque.size() + commonUserDeque.size() << "人" << endl;
+
+			for (VipUser* vip : vipUserDeque)
+			{
+				cout << vip << " ";
+			}
+
+			cout << " | ";
+
+			for (CommonUser* common : commonUserDeque)
+			{
+				cout << common << " ";
+			}
+
+			cout << "\n" << endl;
+
 			_priorUser = true;
 
 			cv.notify_all();
@@ -151,8 +166,19 @@ shared_ptr<Connection> ConnectionPool::getConnection(AbstractUser* _abUser)
 					);
 				}
 			);
-			// 三个条件不满足就一直等，直到都满足
-			commonUserDeque.pop_front();
+			// 因为离开而唤醒
+			if (_abUser->_terminate == true)
+			{
+				// 从CommonUserDeque中删除
+				deleteFromDeque(_abUser);
+				return nullptr;
+			}
+			// 因为有空闲连接可以申请了而唤醒
+			else
+			{
+				// 退出排队
+				commonUserDeque.pop_front();
+			}
 		}
 	}
 	else
@@ -166,7 +192,21 @@ shared_ptr<Connection> ConnectionPool::getConnection(AbstractUser* _abUser)
 				vipUserDeque.push_back(dynamic_cast<VipUser*>(_abUser));
 				cout << "【广播】";
 				cout << "用户" << _abUser << "(VIP):\n——正在排队中......为您开启vip通道，"
-					<< "前面还有" << vipUserDeque.size() - 1 << "人\n" << endl;
+					<< "前面还有" << vipUserDeque.size() - 1 << "人" << endl;
+				
+				for (VipUser* vip : vipUserDeque)
+				{
+					cout << vip << " ";
+				}
+				
+				cout << " | ";
+
+				for (CommonUser* common : commonUserDeque)
+				{
+					cout << common << " ";
+				}
+
+				cout << "\n" << endl;
 
 				_priorUser = true;
 
@@ -182,8 +222,19 @@ shared_ptr<Connection> ConnectionPool::getConnection(AbstractUser* _abUser)
 							);
 					}
 				);
-				// 两个条件不满足就一直等，直到都满足
-				vipUserDeque.pop_front();
+				// 因为离开而唤醒
+				if (_abUser->_terminate == true)
+				{
+					// 从vipUserDeque中删除
+					deleteFromDeque(_abUser);
+					return nullptr;
+				}
+				// 因为有空闲连接可以申请了而唤醒
+				else 
+				{
+					// 退出排队
+					vipUserDeque.pop_front();
+				}
 			}
 			// 如果没有超过，可以为vip用户申请专属的连接
 			else
@@ -201,11 +252,6 @@ shared_ptr<Connection> ConnectionPool::getConnection(AbstractUser* _abUser)
 				_designedForVip = 0;
 			}
 		}
-	}
-
-	if (_abUser->_terminate)
-	{
-		return nullptr;
 	}
 
 	shared_ptr<Connection> sp(_connectQueue.front(),
@@ -338,7 +384,8 @@ void ConnectionPool::deleteFromDeque(AbstractUser* _abUser)
 		{
 			vipUserDeque.erase(it);
 			cout << "【广播】";
-			cout << "用户" << _abUser << "(VIP):\n——退出了排队，VIP用户队列还有: " << vipUserDeque.size() << endl;
+			cout << "用户" << _abUser << "(VIP):\n——退出了排队，VIP用户队列还有: " << 
+				vipUserDeque.size() << endl;
 		}
 		else
 		{
@@ -346,6 +393,21 @@ void ConnectionPool::deleteFromDeque(AbstractUser* _abUser)
 			throw "Error: This user is not in the queue";
 		}
 	}
+
+	for (VipUser* vip : vipUserDeque)
+	{
+		cout << vip << " ";
+	}
+
+	cout << " | ";
+
+	for (CommonUser* common : commonUserDeque)
+	{
+		cout << common << " ";
+	}
+
+	cout << "\n" << endl;
+
 	cv.notify_all();
 
 }

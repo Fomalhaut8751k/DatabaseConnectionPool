@@ -35,18 +35,19 @@ void AbstractUser::toConnect(ConnectionPool* _pConnectPool)
 		unique_lock<std::mutex> lck(_pConnectPool->_queueMutex);
 		if (_waiting)
 		{
-			int choice = rand() % 50 + 1;
+			int choice = rand() % 5000000000 + 1;
 			// 模拟2%的概率用户选择退出排队
 			if (choice <= 1) 
 			{
 				this->_terminate = true;
-				_pConnectPool->deleteFromDeque(this);
+				
+				//_pConnectPool->deleteFromDeque(this);
 				
 				_Connection.reset();
 				_Connection == nullptr;
 				break;
 			}
-			std::this_thread::sleep_for(std::chrono::milliseconds(500));
+			//std::this_thread::sleep_for(std::chrono::milliseconds(100));
 		}
 		// 如果申请到连接了还没有退出排队
 	}

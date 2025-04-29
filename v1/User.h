@@ -11,10 +11,13 @@ class ConnectionPool;
 class AbstractUser
 {
 public:
-	AbstractUser();
+	AbstractUser(int exit = 0);
 	
 	// 用户发起连接请求
 	void toConnect(ConnectionPool* _pConnectPool);
+
+	// 用户发起连接请求（不使用连接池）
+	void toConnectWithoutConnectionPool();
 
 	// 用户行为一
 	void update();
@@ -37,6 +40,8 @@ public:
 	// 线程终止标记
 	atomic_bool _terminate;
 
+	int _exitOrNot;
+
 protected:
 	shared_ptr<Connection> _Connection;
 	clock_t _alivetime;  // 记录进入用户不操作时间
@@ -48,7 +53,7 @@ protected:
 class CommonUser : public AbstractUser
 {
 public:
-	CommonUser();
+	CommonUser(int exit = 0);
 
 	void timeoutRecycleConnect(ConnectionPool* _connectionPool);
 };
@@ -58,7 +63,7 @@ public:
 class VipUser : public AbstractUser
 {
 public:
-	VipUser();
+	VipUser(int exit = 0);
 
 	void timeoutRecycleConnect(ConnectionPool* _connectionPool);
 };

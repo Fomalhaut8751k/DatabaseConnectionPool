@@ -10,12 +10,13 @@
 
 using namespace std;
 
-AbstractUser::AbstractUser() :
+AbstractUser::AbstractUser(int exit) :
 	_Connection(nullptr),
 	_alivetime(clock()),
 	_timeOut(10),
 	_waiting(false),
-	_terminate(false)
+	_terminate(false),
+	_exitOrNot(exit)
 {
 
 }
@@ -29,36 +30,48 @@ void AbstractUser::toConnect(ConnectionPool* _pConnectPool)
 			_Connection = _pConnectPool->getConnection(this);
 		}
 	);
-	while (_Connection == nullptr)
+	if(_Connection == nullptr)
 	{
-		// 如果用户确实在等待
-		unique_lock<std::mutex> lck(_pConnectPool->_queueMutex);
-		if (_waiting)
-		{
-			int choice = rand() % 5000000000 + 1;
-			// 模拟2%的概率用户选择退出排队
-			if (choice <= 1) 
-			{
-				this->_terminate = true;
-				
-				//_pConnectPool->deleteFromDeque(this);
-				
-				_Connection.reset();
-				_Connection == nullptr;
-				break;
+		thread t1(
+			[&]() -> void {
+				if (_Connection == nullptr)
+				{
+					// 每5秒判断一次行为
+					std::this_thread::sleep_for(std::chrono::milliseconds(5000));
+					if (_Connection == nullptr && _waiting)
+					{
+						if (_exitOrNot == 1)
+						{
+							unique_lock<std::mutex> lck(_pConnectPool->_queueMutex);
+
+							this->_terminate = true;
+							_Connection.reset();
+							_Connection == nullptr;
+
+							_pConnectPool->cv.notify_all();
+						}
+					}
+				}
 			}
-			//std::this_thread::sleep_for(std::chrono::milliseconds(100));
-		}
+		);
 		// 如果申请到连接了还没有退出排队
+		t1.join();
+		t0.join();
 	}
+
 	if (_Connection != nullptr)
 	{
 		update();
-		thread t1(bind(&AbstractUser::timeoutRecycleConnect, this, _pConnectPool));
-		t1.join();
+		thread t2(bind(&AbstractUser::timeoutRecycleConnect, this, _pConnectPool));
+		t2.join();
 	}
-	t0.join();
 	
+}
+
+// 用户发起连接请求（不使用连接池）
+void AbstractUser::toConnectWithoutConnectionPool()
+{
+
 }
 
 // 细分用户行为一
@@ -143,14 +156,14 @@ void AbstractUser::userBehavior()
 	
 }
 
-CommonUser::CommonUser():
-	AbstractUser()
+CommonUser::CommonUser(int exit):
+	AbstractUser(exit)
 {
 
 }
 
-VipUser::VipUser() :
-	AbstractUser()
+VipUser::VipUser(int exit) :
+	AbstractUser(exit)
 {
 
 }

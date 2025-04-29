@@ -26,10 +26,14 @@ public:
 	// 删除deque中已经决定退出排队的用户
 	void deleteFromDeque(AbstractUser* _abUser);
 
+	// 展示人数数据
+	void show() const;
+
 	queue<Connection*> _connectQueue;  // 存储mysql连接的队列
 	atomic_bool _priorUser;
 	mutex _queueMutex;  // 维护连接队列的线程安全互斥锁
 	atomic_int _designedForVip;  // 判断是否是为vip专门生产的连接
+	condition_variable cv;  // 设置条件变量，用于连接生产线程和链接消费线程的通信
 
 private:
 	ConnectionPool();
@@ -53,12 +57,13 @@ private:
 	//int _connectionTimeout;  // 连接池获取连接的超时时间
 
 	atomic_int _connectionCnt;  // 记录连接所创建的connection连接的总数量
-	condition_variable cv;  // 设置条件变量，用于连接生产线程和链接消费线程的通信
-
+	
 	deque<CommonUser*> commonUserDeque;  // 普通用户的排队列表
 	deque<VipUser*> vipUserDeque;  // vip用户的排队列表
 
 
 	atomic_bool _produceForVip;  // 判断是否在(initSize, maxSize)条件下发来的请求
+
+	int _numberCount[3] = {0,0,0};
 
 };

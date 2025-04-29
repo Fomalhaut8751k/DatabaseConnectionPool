@@ -118,6 +118,8 @@ shared_ptr<Connection> ConnectionPool::getConnection(AbstractUser* _abUser)
 {
 	unique_lock<mutex> lock(_queueMutex);
 	
+	_numberCount[0] += 1;  // 记录总人数
+
 	cv.wait(lock,
 		[&]() -> bool {
 			return _priorUser == true;
@@ -170,6 +172,7 @@ shared_ptr<Connection> ConnectionPool::getConnection(AbstractUser* _abUser)
 			if (_abUser->_terminate == true)
 			{
 				// 从CommonUserDeque中删除
+				_numberCount[1] += 1;  // 退出排队人数
 				deleteFromDeque(_abUser);
 				return nullptr;
 			}
@@ -225,6 +228,7 @@ shared_ptr<Connection> ConnectionPool::getConnection(AbstractUser* _abUser)
 				// 因为离开而唤醒
 				if (_abUser->_terminate == true)
 				{
+					_numberCount[1] += 1;  // 退出排队人数
 					// 从vipUserDeque中删除
 					deleteFromDeque(_abUser);
 					return nullptr;
@@ -267,6 +271,8 @@ shared_ptr<Connection> ConnectionPool::getConnection(AbstractUser* _abUser)
 			cv.notify_all();
 		}
 	);   // 取队头
+
+	_numberCount[2] += 1;  // 申请到连接的人数
 
 	if (dynamic_cast<CommonUser*>(_abUser) != nullptr)
 	{
@@ -410,4 +416,12 @@ void ConnectionPool::deleteFromDeque(AbstractUser* _abUser)
 
 	cv.notify_all();
 
+}
+
+// 展示人数数据
+void ConnectionPool::show() const
+{
+	cout << "申请连接的总人数: " << _numberCount[0] << "\n"
+		<< "申请到连接的人数: " << _numberCount[2] << "\n"
+		<< "中途退出排队的人数: " << _numberCount[1] << endl;
 }

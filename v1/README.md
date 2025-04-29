@@ -1,8 +1,65 @@
-# 云游戏服务器连接池
+# 云服务器连接池
 
-## 1. 关键技术点
-MySQL数据库编程、单例模式、queue队列容器、C++11多线程编程、线程互斥、线程同步通信和unique_lock、基于CAS的原子整形、智能指针shared_ptr、lambda表达式、生产者-消费者线程模型。
+## 0. 功能点
+在c++连接池项目的基础上，进行修改和增进：
+- 1.将申请连接的用户分为**普通用户**和**vip用户**，它们在申请连接时，连接池系统会根据身份作出不同行为：
+    - 当连接池中尚有空闲连接，则普通用户和vip用户都可以直接申请
+    - 当连接池中没有空闲连接，但总的连接数量小于maxSize时，普通用户需要排队，而vip用户可以为它们额外生产新的连接
+    - 当连接池中没有空闲连接，且总的连接数量不小于maxSize时，普通用户和vip用户都需要排队，但vip用户享有特殊排队通道，即如果有回收的空闲连接，优先分配给在排队的vip用户，直到没有vip用户在排队再考虑普通用户
+
+- 2.用户可以选择退出排队：当用户处在排队等待状态时，它可以退出排队
+
+- 3.用户占据连接但长时间未操作时，连接池会自动回收它的连接
 <br>
+
+## 1.功能测试
+模拟部分用户会选择退出排队的机制，在创建用户对象的时候直接传入随机参数，根据参数判断是否退出排队：
+```cpp
+for (int i = 0; i < 60; i++)
+{
+    arr[i] = rand() % 2;
+}
+```
+```cpp
+ for (int i = 0; i < 60; ++i)
+    {
+        // 0表示普通用户，1表示vip用户
+        int _userType = rand() % 2;
+        _vecUserType.push_back(_userType);
+        if (_userType == 1)
+        {
+            _vecVipUser.push_back(shared_ptr<VipUser>(new VipUser(arr[i])));
+        }
+        else
+        {
+            _vecCommonUser.push_back(shared_ptr<CommonUser>(new CommonUser(arr[i])));
+        }
+    }
+
+```
+当然，只有需要排队的时候才可能出现退出的情况，如果直接申请到了连接就不需要。
+
+### (1) mysql连接测试
+如果申请到了连接，就会执行一次数据库的更新操作：
+```cpp
+if (_Connection != nullptr)
+{
+    update();
+    thread t2(bind(&AbstractUser::timeoutRecycleConnect, this, _pConnectPool));
+    t2.join();
+}
+```
+<img src='img/3.png'>
+<img src='img/4.png'>
+
+<br>
+
+### (2) 项目功能测试
+详见
+> .../result/
+
+### (3) 压力测试
+
 
 
 ## 2. 连接池功能点介绍
@@ -423,6 +480,15 @@ MySQL数据库编程、单例模式、queue队列容器、C++11多线程编程�
 
         但是还有一个棘手的问题：用户端的主进程的notify_all()如何准确找到它对应的
         getConnection()子进程——**把标志设置为成员变量**。
+
+        最终整个退出排队的执行逻辑：
+
+        - User: 用户在一个独立的线程中，发起退出排队请求，并把_terminate置为true，然后cv.notify_all()
+
+        - ConnectionPool: 那些_terminate=true的用户全部被唤醒，其中一个获得了互斥锁
+
+        - ConnectionPool: 如果判断是因为退出排队(_terminate=true)而被唤醒，则调用deleteFromDeque()，从对应的deque队列中删除该用户，并且直接返回nullptr，不再为用户申请连接
+
 
         
 

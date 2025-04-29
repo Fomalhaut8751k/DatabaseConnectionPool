@@ -20,11 +20,17 @@ int main()
 
 // ###### 单独测试vip用户 ##################################################################
 #if 0
+    vector<int> _vecUserType;
+    int arr[60] = {};
 
-    for (int i = 0; i < 50; ++i)
+    for (int i = 0; i < 60; i++)
+    {
+        arr[i] = rand() % 2;
+    }
+    for (int i = 0; i < 60; ++i)
     {
         //_vecCommonUser.push_back(shared_ptr<CommonUser>(new CommonUser));
-        _vecVipUser.push_back(shared_ptr<VipUser>(new VipUser));
+        _vecVipUser.push_back(shared_ptr<VipUser>(new VipUser(arr[i])));
     }
     
     for (shared_ptr<VipUser>& _pUser: _vecVipUser)
@@ -43,10 +49,14 @@ int main()
 #endif
 // ###### 单独测试普通用户 #################################################################
 #if 0
-
-    for (int i = 0; i < 30; ++i)
+    int arr[60] = {};
+    for (int i = 0; i < 60; i++)
     {
-        _vecCommonUser.push_back(shared_ptr<CommonUser>(new CommonUser));
+        arr[i] = rand() % 2;
+    }
+    for (int i = 0; i < 60; ++i)
+    {
+        _vecCommonUser.push_back(shared_ptr<CommonUser>(new CommonUser(arr[i])));
     }
 
     for (shared_ptr<CommonUser>& _pUser : _vecCommonUser)
@@ -66,6 +76,11 @@ int main()
 // ###### 普通用户和vip用户 ###############################################################
 #if 1
     vector<int> _vecUserType;
+    int arr[60] = {};
+    for (int i = 0; i < 60; i++)
+    {
+        arr[i] = rand() % 2;
+    }
 
     for (int i = 0; i < 60; ++i)
     {
@@ -74,11 +89,11 @@ int main()
         _vecUserType.push_back(_userType);
         if (_userType == 1)
         {
-            _vecVipUser.push_back(shared_ptr<VipUser>(new VipUser));
+            _vecVipUser.push_back(shared_ptr<VipUser>(new VipUser(arr[i])));
         }
         else
         {
-            _vecCommonUser.push_back(shared_ptr<CommonUser>(new CommonUser));
+            _vecCommonUser.push_back(shared_ptr<CommonUser>(new CommonUser(arr[i])));
         }
     }
 
@@ -113,7 +128,15 @@ int main()
     }
 
 #endif
-    std::this_thread::sleep_for(std::chrono::seconds(100));
+ // ###### 压力测试 ###########################################
+#if 1
+
+
+
+
+#endif
+
+    _connectPool->show();
 
     return 0;
 }
